@@ -27,7 +27,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "JobFitCV backend auto-updated via CI/CD!"}
+    return {"message": "JobFitCV backend auto-updated via CI/CD!!"}
 
 @app.get("/health")
 def health_check():
