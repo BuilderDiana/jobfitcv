@@ -1,16 +1,18 @@
-# 1. 选一个和 Lambda 一样的 Python 运行环境（官方镜像）
 FROM public.ecr.aws/lambda/python:3.11
 
-# 2. 把依赖清单复制进去
-COPY requirements.txt  .
+# 复制依赖文件
+COPY requirements.txt /var/task/
 
-# 3. 安装依赖到镜像里（注意：这里是在 Linux 里装，避免平台问题）
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r /var/task/requirements.txt
 
-# 4. 把你的应用代码复制进去
-COPY . .
+# 只复制我们真正需要的代码
+COPY main.py /var/task/
+COPY db.py /var/task/
+COPY schemas.py /var/task/
+COPY models.py /var/task/
+COPY repositories /var/task/repositories
+COPY services /var/task/services
 
-# 5. 告诉 Lambda：入口函数在 main.py 里的 handler 变量
-#    对应 Python 模块路径 "main.handler"
+# Lambda 入口
 CMD ["main.handler"]
