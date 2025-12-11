@@ -27,8 +27,9 @@ async def startup_event():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://jobfitcv.com",
-    "https://www.jobfitcv.com"],
+    "https://jobfitcv.com",
+    "https://www.jobfitcv.com",
+     "http://localhost:3000", ] # 本地调试时可以留着],
 
     allow_credentials=True,
     allow_methods=["*"],
