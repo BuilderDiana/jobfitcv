@@ -1,0 +1,22 @@
+第一步: 本地连ec2
+ssh -i ~/.ssh/jobfitcv-bastion-key.pem ec2-user@98.84.125.213
+
+第二步: ec2连rds
+psql -h jobfitcv-postgres.cuzwwyy28wm9.us-east-1.rds.amazonaws.com \
+  -p 5432 \
+  -U jobfitcv \
+  -d postgres
+
+第三步: 输入密码
+
+第四步:
+去到创建的数据库
+\c jobfitcv
+
+........................................
+
+在 psql 里：
+	•	\c jobfitcv（connect 的缩写）= 切换 / 连接到名为 jobfitcv 的数据库，相当于“进入这个数据库去工作”。
+	•	它 不会创建数据库。
+创建数据库通常是 SQL 语句（不是反斜杠命令）：
+	•	CREATE DATABASE jobfitcv; = 创建一个叫 jobfitcv 的数据库

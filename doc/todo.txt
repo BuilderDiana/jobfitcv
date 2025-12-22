@@ -1,0 +1,13 @@
+当前结论（已确认）：
+	•	occupations：1016 个职业
+	•	onet_skills_raw：只覆盖 894 个
+	•	有 122 个职业在 Skills 数据集中本来就不存在
+	•	15-2051.00 Data Scientists 属于 O*NET 官方 Skills 未覆盖职业，不是你操作或建模的问题
+
+TODO（已记录）：
+	•	为无 Skills 的职业设计优雅降级方案，例如：
+	1.	使用 Knowledge / Abilities / Work Activities 兜底
+	2.	在 JobFitCV 前端标注「Skills 数据缺失（O*NET 限制）」
+	3.	匹配时按可用维度动态降权，而非报错
+
+接受：有一批职业在多个维度都会缺

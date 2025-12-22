@@ -1,10 +1,9 @@
 name: Deploy JobFitCV backend to Lambda
 
 on:
-  push:
+  pull_request:
     branches:
-      - main # 如果你用的是别的分支，比如 master，就改成对应的
-
+      - main
 jobs:
   deploy:
     runs-on: ubuntu-latest

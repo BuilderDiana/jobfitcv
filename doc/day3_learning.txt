@@ -1,0 +1,190 @@
+🎯 目标（这一阶段）
+
+在 EC2 上 把 真实 O*NET 数据 导入到你已经建好的表里：
+
+Occupation Data.txt → occupations
+
+Skills.txt → entities（type=skill） + occupation_entities
+
+现在你的数据库像是：
+有 空的表
+有 规则（外键 / 索引）
+但还没有“真实内容”
+
+我们要做的事只有 3 步：
+本地 data/onet
+   ↓（scp）
+EC2 ~/data/onet
+   ↓（psql / copy）
+RDS Postgres 表
+
+✅ 第 0 步：确认你现在在哪（很重要）
+你现在应该是 已经 SSH 进 EC2 的状态，提示符类似：
+[ec2-user@ip-172-31-16-147 ~]$
+
+✅ 第 1 步：把本地 data/onet 传到 EC2
+👉 这一步在你本地电脑终端做（不是 EC2）
+
+假设：
+本地项目路径是：~/jobfitcv/data/onet
+EC2 公网 IP：98.84.125.213
+key 在：~/.ssh/jobfitcv-bastion-key.pem
+
+执行（本地终端）👇(在 JobFitCV 根目录里跑-心智模型清晰：从项目 → 把 data 推到 EC2)
+scp -i ~/.ssh/jobfitcv-bastion-key.pem \
+  -r ~/Desktop/jobfitcv/data/onet \
+  ec2-user@98.84.125.213:~
+
+1️⃣ scp 是什么？
+scp = Secure Copy
+用 SSH 加密通道 在两台机器之间拷贝文件/文件夹（本地 ↔ 远程）。
+
+2️⃣ -i 是什么？
+-i = identity file
+指定 SSH 私钥文件，用这把钥匙去登录远程服务器。
+
+3️⃣ -r 是什么？
+-r = recursive（递归）
+表示拷贝的是 整个文件夹及其所有子文件，没有 -r 只能拷单个文件。
+
+
+jobfitcv=> 这个提示符说明：你在 Postgres（psql）里
+	•	所以你输入 ls 会报错 —— 因为 ls 是 Linux 命令，不是 SQL
+
+👉 结论：
+	•	✅ 数据 已经在 EC2 上
+	•	❌ 还 没有导入 RDS
+	•	🔁 你需要先 从 psql 退回 EC2 Shell
+
+第一步：从 Postgres 回到 EC2（最重要）
+在 jobfitcv=> 下输入：
+\q
+你会看到提示符变成类似：
+[ec2-user@ip-xxx ~]$
+再确认里面文件：
+ls ~/onet
+看到一堆 *.txt，说明 scp 完全成功 ✅
+第三步：重新进入 Postgres（准备导入）
+现在再连回数据库：psql jobfitcv
+看到：jobfitcv=>
+
+
+sed 是 Stream EDitor（流编辑器） 的缩写。
+sed -n '1,3p' ~/onet/Occupation\ Data.txt
+意思是：
+	•	-n：不要默认把所有行都打印出来（不然会刷屏）
+	•	'1,3p'：只把 第 1 到第 3 行 打印出来（p = print）
+	•	所以整句就是：只看这个文件的前 3 行
+一句话记住：sed = 命令行里的文本“剪刀/笔”，你现在用它主要是“快速查看某几行”。
+
+从 ec2-user@...$（Linux 终端）
+
+到 jobfitcv=>（Postgres 里面）
+
+👉 本质上就是两台“世界”的切换
+👉 每次新连接，默认都要再连一次数据库
+先把世界分清楚（非常重要）
+
+你现在其实在 3 个世界之间来回切换：
+
+🌍 世界一：EC2 的 Linux
+[ec2-user@ip-172-31-16-147 ~]$
+这是：
+一台云电脑
+你在“操作系统层”
+能跑 bash、sed、awk、psql 命令
+
+🌍 世界二：PostgreSQL 客户端连接中
+jobfitcv=>
+这是：
+你已经“钻进”数据库内部
+所有命令都是 SQL / psql 元命令（\dt, \copy 等）
+这里不能跑 bash
+
+🌍 世界三：RDS（真正的数据库）
+你永远不会 ssh 进 RDS
+只能通过 psql / 程序连进去（这是云数据库的安全模型）
+
+这 4 张表里都有“测试数据”，我们先一键清空，再补你要的 check 约束。
+在 jobfitcv=> 直接跑这一句（原样复制）：
+TRUNCATE TABLE occupation_entities, entities, occupations, scales
+RESTART IDENTITY
+CASCADE;
+
+(
+    TRUNCATE 是什么？把表里的所有行瞬间清空（不是删表结构，只清数据）。
+和 DELETE FROM table; 的区别：TRUNCATE 通常更快、更“彻底”。
+
+ RESTART IDENTITY 里的 identity 是什么？
+ identity 指“自增身份列”（比如 SERIAL / GENERATED ... AS IDENTITY 这类会自动递增的列）。
+RESTART IDENTITY 的意思是：把这些自增计数器重置，下次插入又从 1（或初始值）开始编号。
+
+CASCADE 是什么？
+连同所有“依赖这些表”的表，也一起 truncate（或按依赖顺序处理），避免外键卡住。
+
+)
+跑完立刻确认都空了：
+SELECT 'occupations' AS table_name, COUNT(*) AS n FROM occupations
+UNION ALL SELECT 'entities', COUNT(*) FROM entities
+UNION ALL SELECT 'occupation_entities', COUNT(*) FROM occupation_entities
+UNION ALL SELECT 'scales', COUNT(*) FROM scales;
+
+下一步：先把“防乱填”的约束补上（先做最关键的 1 个）
+在 jobfitcv=> 里执行：
+ALTER TABLE entities
+ADD CONSTRAINT chk_entities_type
+CHECK (type IN ('skill', 'knowledge', 'ability', 'tool', 'activity'));
+
+下一步我们把 occupations 补齐，避免你之前 \copy 的 3 列报错。
+在 jobfitcv=> 执行这一句：
+ALTER TABLE occupations ADD COLUMN description TEXT;
+在 jobfitcv=> 执行（原样复制）：
+\copy occupations(onetsoc_code, title, description)
+FROM '/home/ec2-user/onet/Occupation Data.txt'
+WITH (FORMAT csv, HEADER true, DELIMITER E'\t');
+
+把 Skills.txt 这类“列很多、还带统计字段”的 O*NET 文件用专业数据仓库思路落好。
+下面给你一个生产级、可扩展的表设计（建议：Raw → Fact），既能完整保留原始数据，又能无痛接入你现有的 entities / occupation_entities / scales / occupations。
+1）先建一个 Raw 表：1:1 接住 Skills.txt 的 13 列
+目标：导入永远不出幺蛾子；先把原始数据“接住”，再做清洗/规范化。
+
+
+2) 立刻确认：哪些职业在 occupations 里但在 skills 里缺失（看缺口规模）
+SELECT COUNT(*) AS occupations_without_skills
+FROM occupations o
+LEFT JOIN (
+  SELECT DISTINCT onetsoc_code FROM onet_skills_raw
+) s ON s.onetsoc_code = o.onetsoc_code
+WHERE s.onetsoc_code IS NULL;
+
+
+1) 把 Knowledge 的“实体”写进 entities（去重）
+INSERT INTO entities (type, name, source_ref)
+SELECT DISTINCT
+  'knowledge' AS type,
+  element_name AS name,
+  element_id AS source_ref
+FROM onet_knowledge_raw
+ON CONFLICT (type, name) DO NOTHING;
+
+1️⃣ SELECT DISTINCT 是什么？
+DISTINCT 表示去重。
+也就是说：
+从 onet_knowledge_raw 里取数据时，如果多行的 element_name + element_id 组合是一样的，只保留一条，避免一次插入重复行。
+
+2️⃣ ON CONFLICT (type, name) 是什么意思？
+conflict 的意思是：发生冲突。
+这里的“冲突”特指——违反了唯一约束（UNIQUE）。
+你之前在 entities 表里有这条规则：
+UNIQUE (type, name)
+意思是：
+👉 同一个 type + name 只能存在一条记录
+
+3️⃣ DO NOTHING 是在干嘛？
+当插入时发现：
+	•	表里已经有一条 type = 'knowledge'
+	•	且 name 一模一样
+
+那这条 INSERT 就：
+👉 什么都不做，直接跳过这条数据，不报错
+

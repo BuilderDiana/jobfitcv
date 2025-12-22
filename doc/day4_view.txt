@@ -1,0 +1,11 @@
+CREATE VIEW occupation_profile AS
+SELECT
+  o.onetsoc_code,
+  o.title,
+  e.type,
+  e.name,
+  oe.scale,
+  oe.value
+FROM occupation_entities oe
+JOIN occupations o ON o.onetsoc_code = oe.onetsoc_code
+JOIN entities e ON e.entity_id = oe.entity_id;
